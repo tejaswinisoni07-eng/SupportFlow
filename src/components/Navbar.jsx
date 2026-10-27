@@ -23,9 +23,6 @@ export default function Navbar({ onOpenNewTicket, onResetDemo, onOpenSystemInfo,
                 <span className="text-xl font-bold tracking-tight text-slate-900">
                   Support<span className="text-indigo-600">Flow</span>
                 </span>
-                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  Capstone Project
-                </span>
               </div>
               <p className="hidden md:block text-xs text-slate-500 font-medium">
                 Customer Support Ticketing System
