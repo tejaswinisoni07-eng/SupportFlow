@@ -11,6 +11,7 @@ import {
   CheckCircle,
   HelpCircle
 } from 'lucide-react';
+import { getSlaInfo } from '../utils/sla';
 
 export function getPriorityBadge(priority) {
   switch (priority) {
@@ -111,6 +112,7 @@ function formatDate(isoString) {
 
 export default function TicketCard({ ticket, onSelectTicket }) {
   const repliesCount = ticket.replies?.length || 0;
+  const sla = getSlaInfo(ticket);
 
   return (
     <div
@@ -121,7 +123,7 @@ export default function TicketCard({ ticket, onSelectTicket }) {
         {/* Top Badges row */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center space-x-2">
-            <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+            <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 group-hover:border-indigo-200">
               {ticket.id}
             </span>
             {getCategoryBadge(ticket.category)}
@@ -139,9 +141,19 @@ export default function TicketCard({ ticket, onSelectTicket }) {
         </h3>
 
         {/* Description preview */}
-        <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 mb-4 leading-relaxed">
+        <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 mb-3 leading-relaxed">
           {ticket.description}
         </p>
+
+        {/* SLA Status Pill if configured */}
+        {sla.status !== 'none' && (
+          <div className="mb-3">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-3xs font-medium border ${sla.badgeClass}`}>
+              <Clock className="w-2.5 h-2.5 mr-1" />
+              <span>{sla.label}: <strong className="ml-1">{sla.timeText}</strong></span>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Bottom Footer Info */}

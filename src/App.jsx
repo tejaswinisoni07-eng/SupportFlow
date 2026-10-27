@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import DashboardStats from './components/DashboardStats';
+import AnalyticsCharts from './components/AnalyticsCharts';
 import TicketFilters from './components/TicketFilters';
 import TicketCard from './components/TicketCard';
+import TicketTableView from './components/TicketTableView';
 import TicketDetailModal from './components/TicketDetailModal';
 import NewTicketModal from './components/NewTicketModal';
 import SystemInfoModal from './components/SystemInfoModal';
@@ -16,7 +18,7 @@ import {
   deleteTicket,
   resetDemoTickets,
 } from './services/api';
-import { Plus, RotateCcw, AlertCircle, Sparkles, Inbox } from 'lucide-react';
+import { Plus, RotateCcw, AlertCircle, Sparkles, Inbox, BarChart2 } from 'lucide-react';
 
 export default function App() {
   const [tickets, setTickets] = useState([]);
@@ -25,12 +27,13 @@ export default function App() {
   const [isResetting, setIsResetting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Filters state
+  // Filters & View state
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('All');
   const [priority, setPriority] = useState('All');
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('createdAt');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
 
   // Modals state
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -47,7 +50,7 @@ export default function App() {
     }, 4000);
   };
 
-  // Load tickets and dashboard metrics
+  // Load tickets and dashboard metrics with local storage cache fallback
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -58,8 +61,28 @@ export default function App() {
       ]);
       setTickets(ticketsData);
       setStats(statsData);
+
+      // Save backup snapshot to localStorage for offline / quick reload resilience
+      try {
+        localStorage.setItem('supportflow_backup_cache', JSON.stringify({ tickets: ticketsData, stats: statsData, ts: Date.now() }));
+      } catch {
+        // Ignore quota errors if storage full
+      }
     } catch (err) {
       console.error('Error loading data:', err);
+      // Attempt to load from localStorage cache if server is temporarily unreachable
+      try {
+        const cached = localStorage.getItem('supportflow_backup_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed.tickets)) {
+            setTickets(parsed.tickets);
+            setStats(parsed.stats);
+          }
+        }
+      } catch {
+        // ignore
+      }
       setError('Could not connect to SupportFlow backend. Please ensure the server is running on port 5000.');
     } finally {
       setIsLoading(false);
@@ -72,13 +95,13 @@ export default function App() {
 
   // Handle resetting demo tickets
   const handleResetDemo = async () => {
-    if (!window.confirm('Reset all tickets back to the original capstone demonstration dataset? Any custom created tickets will be replaced.')) {
+    if (!window.confirm('Reset all tickets back to the original demonstration dataset? Any custom created tickets will be replaced.')) {
       return;
     }
     try {
       setIsResetting(true);
       await resetDemoTickets();
-      showToast('Demo data reset to initial capstone state!', 'success');
+      showToast('Demo data reset to initial default state!', 'success');
       await loadData();
     } catch {
       showToast('Failed to reset demo data', 'error');
@@ -170,7 +193,7 @@ export default function App() {
             </div>
             <button
               onClick={loadData}
-              className="text-xs font-semibold px-3 py-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700"
+              className="text-xs font-semibold px-3 py-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
             >
               Retry Connection
             </button>
@@ -184,6 +207,9 @@ export default function App() {
           onSelectStatus={(st) => setStatus(st)}
         />
 
+        {/* Live Charts & Analytics Section */}
+        <AnalyticsCharts tickets={tickets} />
+
         {/* Search, Filter & Controls */}
         <TicketFilters
           search={search}
@@ -196,11 +222,13 @@ export default function App() {
           setCategory={setCategory}
           sortBy={sortBy}
           setSortBy={setSortBy}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
           totalResults={tickets.length}
           onResetFilters={handleResetFilters}
         />
 
-        {/* Tickets Grid / List View */}
+        {/* Tickets View (Grid Cards or Data Table) */}
         {isLoading && tickets.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-2xs">
             <div className="inline-block animate-spin text-indigo-600 mb-3">
@@ -215,23 +243,29 @@ export default function App() {
             </div>
             <h3 className="text-base font-bold text-slate-800">No support tickets found</h3>
             <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1 mb-5">
-              No tickets matched your active filter criteria. Try adjusting your search term, changing filters, or reset to sample data.
+              No tickets matched your search query or active filter settings. Try adjusting criteria or clear your filters.
             </p>
             <div className="flex items-center justify-center space-x-3">
               <button
                 onClick={handleResetFilters}
-                className="px-4 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="px-4 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Clear Filters
               </button>
               <button
                 onClick={handleResetDemo}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs sm:text-sm font-semibold hover:bg-indigo-700 shadow-2xs"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs sm:text-sm font-semibold hover:bg-indigo-700 shadow-2xs transition-colors"
               >
-                Reset Demo Data
+                Restore Demo Data
               </button>
             </div>
           </div>
+        ) : viewMode === 'table' ? (
+          <TicketTableView
+            tickets={tickets}
+            onSelectTicket={(t) => setSelectedTicket(t)}
+            onEditTicket={(t) => setSelectedTicket(t)}
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {tickets.map((ticket) => (
@@ -250,7 +284,7 @@ export default function App() {
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
-            <span className="font-semibold text-slate-800">SupportFlow</span> — Customer Support Ticketing System (Capstone Submission)
+            <span className="font-semibold text-slate-800">SupportFlow</span> — Customer Support Ticketing System
           </div>
           <div className="flex items-center space-x-4">
             <button
@@ -260,7 +294,7 @@ export default function App() {
               Storage Limitations & Architecture
             </button>
             <span className="text-slate-300">|</span>
-            <span>Local JSON Store</span>
+            <span>Local Atomic JSON Store</span>
           </div>
         </div>
       </footer>

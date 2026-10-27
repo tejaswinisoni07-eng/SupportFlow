@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Sparkles, 
@@ -14,10 +14,16 @@ import {
   Copy,
   Trash2,
   Bot,
-  Info
+  Info,
+  Pencil,
+  Save,
+  CheckCircle2,
+  Flame,
+  AlertTriangle
 } from 'lucide-react';
 import { getPriorityBadge, getStatusBadge, getCategoryBadge } from './TicketCard';
 import { fetchAiSuggestions } from '../services/api';
+import { getSlaInfo } from '../utils/sla';
 
 export default function TicketDetailModal({ 
   ticket, 
@@ -27,6 +33,21 @@ export default function TicketDetailModal({
   onDeleteTicket,
   showToast 
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    customerName: '',
+    customerEmail: '',
+    subject: '',
+    description: '',
+    category: 'General Inquiry',
+    priority: 'Medium',
+    status: 'Open',
+    assignedTo: '',
+    slaDeadline: '',
+  });
+  const [editErrors, setEditErrors] = useState({});
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
   const [replyMessage, setReplyMessage] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState(null);
@@ -34,9 +55,29 @@ export default function TicketDetailModal({
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   const [resolveOnReply, setResolveOnReply] = useState(false);
 
+  // Sync edit form data whenever ticket changes
+  useEffect(() => {
+    if (ticket) {
+      setEditFormData({
+        customerName: ticket.customerName || '',
+        customerEmail: ticket.customerEmail || '',
+        subject: ticket.subject || '',
+        description: ticket.description || '',
+        category: ticket.category || 'General Inquiry',
+        priority: ticket.priority || 'Medium',
+        status: ticket.status || 'Open',
+        assignedTo: ticket.assignedTo || 'Unassigned',
+        slaDeadline: ticket.slaDeadline ? new Date(ticket.slaDeadline).toISOString().slice(0, 16) : '',
+      });
+      setEditErrors({});
+    }
+  }, [ticket]);
+
   if (!ticket) return null;
 
-  // Handle status update
+  const sla = getSlaInfo(ticket);
+
+  // Handle quick status update
   const handleStatusChange = async (newStatus) => {
     try {
       await onUpdateTicket(ticket.id, { status: newStatus });
@@ -46,13 +87,61 @@ export default function TicketDetailModal({
     }
   };
 
-  // Handle priority update
+  // Handle quick priority update
   const handlePriorityChange = async (newPriority) => {
     try {
       await onUpdateTicket(ticket.id, { priority: newPriority });
       showToast(`Priority updated to ${newPriority}`, 'success');
     } catch {
       showToast('Failed to update priority', 'error');
+    }
+  };
+
+  // Validate edit form
+  const validateEdit = () => {
+    const errs = {};
+    if (!editFormData.customerName.trim()) errs.customerName = 'Customer name is required';
+    if (!editFormData.customerEmail.trim()) {
+      errs.customerEmail = 'Customer email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editFormData.customerEmail)) {
+      errs.customerEmail = 'Valid email address required';
+    }
+    if (!editFormData.subject.trim()) errs.subject = 'Subject is required';
+    if (!editFormData.description.trim()) errs.description = 'Description is required';
+
+    setEditErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  // Save edit form
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!validateEdit()) return;
+
+    setIsSavingEdit(true);
+    try {
+      const updates = {
+        customerName: editFormData.customerName.trim(),
+        customerEmail: editFormData.customerEmail.trim(),
+        subject: editFormData.subject.trim(),
+        description: editFormData.description.trim(),
+        category: editFormData.category,
+        priority: editFormData.priority,
+        status: editFormData.status,
+        assignedTo: editFormData.assignedTo.trim() || 'Unassigned',
+      };
+
+      if (editFormData.slaDeadline) {
+        updates.slaDeadline = new Date(editFormData.slaDeadline).toISOString();
+      }
+
+      await onUpdateTicket(ticket.id, updates);
+      setIsEditing(false);
+      showToast('Ticket details updated successfully!', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to update ticket details', 'error');
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -82,7 +171,7 @@ export default function TicketDetailModal({
   const handleUseDraft = (draftText) => {
     setReplyMessage(draftText);
     setIsAiAssistedReply(true);
-    showToast('AI draft applied to reply box', 'info');
+    showToast('AI draft inserted into response box', 'info');
   };
 
   // Send reply
@@ -136,110 +225,352 @@ export default function TicketDetailModal({
               {ticket.id}
             </span>
             {getCategoryBadge(ticket.category)}
+            {sla.status !== 'none' && (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-3xs font-medium border ${sla.badgeClass}`}>
+                <Clock className="w-3 h-3 mr-1" />
+                {sla.label} · {sla.timeText}
+              </span>
+            )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center space-x-2">
+            {!isEditing ? (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-2xs"
+              >
+                <Pencil className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+                Edit Ticket
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 transition-colors"
+              >
+                Cancel Edit
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Body */}
         <div className="p-6 overflow-y-auto space-y-6">
           
-          {/* Quick Controls: Status & Priority Switchers */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Status Selector */}
-              <div>
-                <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                  Ticket Status
-                </label>
-                <select
-                  value={ticket.status}
-                  onChange={(e) => handleStatusChange(e.target.value)}
-                  className="bg-white border border-slate-300 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-2xs"
-                >
-                  <option value="Open">🔵 Open</option>
-                  <option value="In Progress">🟡 In Progress</option>
-                  <option value="Resolved">🟢 Resolved</option>
-                  <option value="Closed">⚪ Closed</option>
-                </select>
+          {/* EDIT MODE FORM */}
+          {isEditing ? (
+            <form onSubmit={handleSaveEdit} className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center">
+                  <Pencil className="w-4 h-4 mr-1.5 text-indigo-600" />
+                  Edit Support Ticket ({ticket.id})
+                </h3>
+                <span className="text-xs text-slate-500">All changes will persist immediately</span>
               </div>
 
-              {/* Priority Selector */}
-              <div>
-                <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                  Priority Level
-                </label>
-                <select
-                  value={ticket.priority}
-                  onChange={(e) => handlePriorityChange(e.target.value)}
-                  className="bg-white border border-slate-300 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-2xs"
-                >
-                  <option value="Urgent">🔥 Urgent</option>
-                  <option value="High">⚠️ High</option>
-                  <option value="Medium">🔷 Medium</option>
-                  <option value="Low">⚪ Low</option>
-                </select>
-              </div>
-
-              {/* Assigned To */}
-              <div>
-                <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                  Assigned Agent
-                </label>
-                <span className="text-xs sm:text-sm font-medium text-slate-700 bg-white px-3 py-1.5 rounded-xl border border-slate-200 inline-block shadow-2xs">
-                  {ticket.assignedTo || 'Unassigned'}
-                </span>
-              </div>
-            </div>
-
-            {/* Created Timestamp */}
-            <div className="text-right text-xs text-slate-500">
-              <div>Created: <span className="font-medium text-slate-700">{formatDate(ticket.createdAt)}</span></div>
-              {ticket.updatedAt && (
-                <div>Updated: <span className="font-medium text-slate-700">{formatDate(ticket.updatedAt)}</span></div>
-              )}
-            </div>
-          </div>
-
-          {/* Ticket Title & Customer Info */}
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
-              {ticket.subject}
-            </h2>
-
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-base">
-                  {ticket.customerName ? ticket.customerName.charAt(0).toUpperCase() : 'C'}
-                </div>
+              {/* Customer Name & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900">{ticket.customerName}</h4>
-                  <p className="text-xs text-slate-500 flex items-center">
-                    <Mail className="w-3 h-3 mr-1" />
-                    {ticket.customerEmail}
-                  </p>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Customer Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.customerName}
+                    onChange={(e) => setEditFormData({ ...editFormData, customerName: e.target.value })}
+                    className={`w-full px-3 py-2 bg-white border rounded-xl text-sm ${
+                      editErrors.customerName ? 'border-rose-400' : 'border-slate-300'
+                    }`}
+                  />
+                  {editErrors.customerName && (
+                    <p className="text-xs text-rose-500 mt-1">{editErrors.customerName}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Customer Email <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={editFormData.customerEmail}
+                    onChange={(e) => setEditFormData({ ...editFormData, customerEmail: e.target.value })}
+                    className={`w-full px-3 py-2 bg-white border rounded-xl text-sm ${
+                      editErrors.customerEmail ? 'border-rose-400' : 'border-slate-300'
+                    }`}
+                  />
+                  {editErrors.customerEmail && (
+                    <p className="text-xs text-rose-500 mt-1">{editErrors.customerEmail}</p>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                {getPriorityBadge(ticket.priority)}
-                {getStatusBadge(ticket.status)}
-              </div>
-            </div>
-          </div>
 
-          {/* Description Block */}
-          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-              Original Issue Description
-            </h4>
-            <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line">
-              {ticket.description}
-            </p>
-          </div>
+              {/* Category, Priority, Status, Assigned To */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={editFormData.category}
+                    onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
+                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium cursor-pointer"
+                  >
+                    <option value="Technical">Technical</option>
+                    <option value="Billing">Billing</option>
+                    <option value="Account Access">Account Access</option>
+                    <option value="Feature Request">Feature Request</option>
+                    <option value="General Inquiry">General Inquiry</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Priority
+                  </label>
+                  <select
+                    value={editFormData.priority}
+                    onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })}
+                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium cursor-pointer"
+                  >
+                    <option value="Urgent">🔥 Urgent</option>
+                    <option value="High">⚠️ High</option>
+                    <option value="Medium">🔷 Medium</option>
+                    <option value="Low">⚪ Low</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium cursor-pointer"
+                  >
+                    <option value="Open">🔵 Open</option>
+                    <option value="In Progress">🟡 In Progress</option>
+                    <option value="Resolved">🟢 Resolved</option>
+                    <option value="Closed">⚪ Closed</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Assigned Agent
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.assignedTo}
+                    onChange={(e) => setEditFormData({ ...editFormData, assignedTo: e.target.value })}
+                    placeholder="e.g. Sarah Chen"
+                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Subject */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Subject <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.subject}
+                  onChange={(e) => setEditFormData({ ...editFormData, subject: e.target.value })}
+                  className={`w-full px-3 py-2 bg-white border rounded-xl text-sm ${
+                    editErrors.subject ? 'border-rose-400' : 'border-slate-300'
+                  }`}
+                />
+                {editErrors.subject && (
+                  <p className="text-xs text-rose-500 mt-1">{editErrors.subject}</p>
+                )}
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Detailed Description <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  className={`w-full p-3 bg-white border rounded-xl text-sm ${
+                    editErrors.description ? 'border-rose-400' : 'border-slate-300'
+                  }`}
+                />
+                {editErrors.description && (
+                  <p className="text-xs text-rose-500 mt-1">{editErrors.description}</p>
+                )}
+              </div>
+
+              {/* SLA Target Deadline */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  SLA Target Deadline (Optional)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editFormData.slaDeadline}
+                  onChange={(e) => setEditFormData({ ...editFormData, slaDeadline: e.target.value })}
+                  className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm text-slate-700"
+                />
+              </div>
+
+              {/* Save / Cancel buttons */}
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl text-xs sm:text-sm font-medium hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="inline-flex items-center px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 shadow-2xs"
+                >
+                  <Save className="w-3.5 h-3.5 mr-1.5" />
+                  <span>{isSavingEdit ? 'Saving...' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              {/* VIEW MODE: Quick Controls Status & Priority */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Status Selector */}
+                  <div>
+                    <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      Ticket Status
+                    </label>
+                    <select
+                      value={ticket.status}
+                      onChange={(e) => handleStatusChange(e.target.value)}
+                      className="bg-white border border-slate-300 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-2xs"
+                    >
+                      <option value="Open">🔵 Open</option>
+                      <option value="In Progress">🟡 In Progress</option>
+                      <option value="Resolved">🟢 Resolved</option>
+                      <option value="Closed">⚪ Closed</option>
+                    </select>
+                  </div>
+
+                  {/* Priority Selector */}
+                  <div>
+                    <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      Priority Level
+                    </label>
+                    <select
+                      value={ticket.priority}
+                      onChange={(e) => handlePriorityChange(e.target.value)}
+                      className="bg-white border border-slate-300 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-2xs"
+                    >
+                      <option value="Urgent">🔥 Urgent</option>
+                      <option value="High">⚠️ High</option>
+                      <option value="Medium">🔷 Medium</option>
+                      <option value="Low">⚪ Low</option>
+                    </select>
+                  </div>
+
+                  {/* Assigned To */}
+                  <div>
+                    <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      Assigned Agent
+                    </label>
+                    <span className="text-xs sm:text-sm font-medium text-slate-700 bg-white px-3 py-1.5 rounded-xl border border-slate-200 inline-block shadow-2xs">
+                      {ticket.assignedTo || 'Unassigned'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Timestamps */}
+                <div className="text-right text-xs text-slate-500">
+                  <div>Created: <span className="font-medium text-slate-700">{formatDate(ticket.createdAt)}</span></div>
+                  {ticket.updatedAt && (
+                    <div>Updated: <span className="font-medium text-slate-700">{formatDate(ticket.updatedAt)}</span></div>
+                  )}
+                </div>
+              </div>
+
+              {/* SLA Target & Tracking Panel */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-xl ${
+                    sla.isOverdue ? 'bg-rose-100 text-rose-700' : sla.isApproaching ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        SLA Service Level Target
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-3xs font-bold uppercase ${sla.badgeClass}`}>
+                        {sla.label}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 mt-0.5">
+                      {sla.timeText}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-xs text-slate-500 text-right">
+                  <span>Deadline: </span>
+                  <span className="font-semibold text-slate-800">{sla.deadlineFormatted}</span>
+                </div>
+              </div>
+
+              {/* Title & Customer Information */}
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
+                  {ticket.subject}
+                </h2>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-base">
+                      {ticket.customerName ? ticket.customerName.charAt(0).toUpperCase() : 'C'}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">{ticket.customerName}</h4>
+                      <p className="text-xs text-slate-500 flex items-center">
+                        <Mail className="w-3 h-3 mr-1" />
+                        {ticket.customerEmail}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {getPriorityBadge(ticket.priority)}
+                    {getStatusBadge(ticket.status)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Description Block */}
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Original Issue Description
+                </h4>
+                <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line">
+                  {ticket.description}
+                </p>
+              </div>
+            </>
+          )}
 
           {/* AI-ASSISTED RESPONSE SUGGESTION PANEL */}
           <div className="bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/70 rounded-2xl border border-indigo-200 p-5 shadow-xs space-y-4">
@@ -250,9 +581,9 @@ export default function TicketDetailModal({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-                    <span>AI-Assisted Response Generator</span>
+                    <span>AI-Assisted Response Assistant</span>
                     <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 uppercase tracking-wider">
-                      Smart Assistant
+                      Demo Engine
                     </span>
                   </h3>
                   <p className="text-xs text-slate-600">
@@ -268,22 +599,22 @@ export default function TicketDetailModal({
                 className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-xl shadow-xs transition-all disabled:opacity-50"
               >
                 <Sparkles className={`w-3.5 h-3.5 mr-1.5 ${isAiLoading ? 'animate-spin' : ''}`} />
-                <span>{isAiLoading ? 'Analyzing Context...' : 'Generate AI Suggestions'}</span>
+                <span>{isAiLoading ? 'Generating...' : 'Suggest Replies'}</span>
               </button>
             </div>
 
-            {/* AI Transparency Disclaimer Banner */}
-            <div className="bg-white/80 p-3 rounded-xl border border-indigo-100 text-xs text-slate-600 flex items-start space-x-2">
+            {/* AI Transparency Notice */}
+            <div className="bg-white/90 p-3 rounded-xl border border-indigo-100 text-xs text-slate-600 flex items-start space-x-2">
               <Info className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold text-indigo-900">Transparent AI Status: </span>
+                <span className="font-semibold text-indigo-900">AI Architecture Mode: </span>
                 {aiResult ? (
                   <span>
-                    <strong>Mode:</strong> {aiResult.mode}. {aiResult.disclaimer}
+                    <strong>{aiResult.mode}</strong>. {aiResult.disclaimer}
                   </span>
                 ) : (
                   <span>
-                    Simulated Demo Engine active (heuristic contextual reasoning). If a <code>GEMINI_API_KEY</code> is provided in <code>.env</code>, live generative AI will be used.
+                    Simulated Contextual Heuristic Engine active (offline-ready, zero API keys required). If a <code>GEMINI_API_KEY</code> is set in <code>.env</code>, live generative AI will be invoked automatically.
                   </span>
                 )}
               </div>
@@ -360,7 +691,7 @@ export default function TicketDetailModal({
                     className={`p-4 rounded-2xl border ${
                       isAgent
                         ? 'bg-indigo-50/50 border-indigo-200 ml-4 sm:ml-8'
-                        : 'bg-white border-slate-200 mr-4 sm:mr-8'
+                        : 'bg-white border-slate-200 mr-4 sm:ml-0'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">

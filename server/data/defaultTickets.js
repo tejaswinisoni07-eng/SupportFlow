@@ -12,6 +12,7 @@ export const DEFAULT_TICKETS = [
     isSample: true,
     createdAt: new Date(Date.now() - 3600000 * 4).toISOString(), // 4 hours ago
     updatedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+    slaDeadline: new Date(Date.now() + 3600000 * 2).toISOString(), // Approaching (due in 2h)
     replies: [
       {
         id: "rep-1",
@@ -42,6 +43,7 @@ export const DEFAULT_TICKETS = [
     isSample: true,
     createdAt: new Date(Date.now() - 3600000 * 1).toISOString(), // 1 hour ago
     updatedAt: new Date(Date.now() - 3600000 * 1).toISOString(),
+    slaDeadline: new Date(Date.now() + 3600000 * 3).toISOString(), // Approaching (due in 3h)
     replies: [
       {
         id: "rep-3",
@@ -65,6 +67,7 @@ export const DEFAULT_TICKETS = [
     isSample: true,
     createdAt: new Date(Date.now() - 3600000 * 6).toISOString(),
     updatedAt: new Date(Date.now() - 3600000 * 6).toISOString(),
+    slaDeadline: new Date(Date.now() - 3600000 * 2).toISOString(), // Overdue by 2 hours
     replies: [
       {
         id: "rep-4",
@@ -88,6 +91,7 @@ export const DEFAULT_TICKETS = [
     isSample: true,
     createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
     updatedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+    slaDeadline: new Date(Date.now() + 3600000 * 30).toISOString(), // On Track (due in 30h)
     replies: [
       {
         id: "rep-5",
@@ -118,6 +122,7 @@ export const DEFAULT_TICKETS = [
     isSample: true,
     createdAt: new Date(Date.now() - 3600000 * 26).toISOString(),
     updatedAt: new Date(Date.now() - 3600000 * 26).toISOString(),
+    slaDeadline: new Date(Date.now() + 3600000 * 46).toISOString(), // On Track (due in 46h)
     replies: [
       {
         id: "rep-7",
@@ -141,6 +146,7 @@ export const DEFAULT_TICKETS = [
     isSample: true,
     createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
     updatedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+    slaDeadline: new Date(Date.now() - 3600000 * 24).toISOString(), // Resolved in 36h (< 24h overdue = Breached or Met depending on SLA target)
     replies: [
       {
         id: "rep-8",
@@ -171,6 +177,7 @@ export const DEFAULT_TICKETS = [
     isSample: true,
     createdAt: new Date(Date.now() - 3600000 * 72).toISOString(),
     updatedAt: new Date(Date.now() - 3600000 * 30).toISOString(),
+    slaDeadline: new Date(Date.now() - 3600000 * 24).toISOString(), // Resolved in 42h (< 48h SLA -> Met)
     replies: [
       {
         id: "rep-10",

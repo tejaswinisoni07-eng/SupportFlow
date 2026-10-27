@@ -78,7 +78,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { customerName, customerEmail, subject, description, category, priority } = req.body;
+    const { customerName, customerEmail, subject, description, category, priority, slaDeadline, assignedTo } = req.body;
 
     if (!customerName || !customerName.trim()) {
       return res.status(400).json({ success: false, error: 'Customer name is required' });
@@ -97,6 +97,8 @@ router.post('/', async (req, res) => {
       description,
       category: category || 'General Inquiry',
       priority: priority || 'Medium',
+      slaDeadline,
+      assignedTo,
     });
 
     res.status(201).json({
@@ -116,7 +118,7 @@ router.post('/', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const allowedFields = ['status', 'priority', 'category', 'assignedTo', 'subject', 'description'];
+    const allowedFields = ['status', 'priority', 'category', 'assignedTo', 'subject', 'description', 'customerName', 'customerEmail', 'slaDeadline'];
     const updates = {};
     for (const key of allowedFields) {
       if (req.body[key] !== undefined) {

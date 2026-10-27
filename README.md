@@ -1,7 +1,7 @@
 # SupportFlow — Customer Support Ticketing System
 
-> **Capstone Project Submission**  
-> A complete, polished, responsive customer support ticketing web application featuring an executive dashboard, complete ticket lifecycle management, intelligent AI-assisted response drafting, and persistent local storage.
+> **Submission-Ready Capstone Project**  
+> A complete, polished, responsive customer support ticketing web application featuring an executive metrics dashboard, live analytics charts, complete ticket lifecycle management with full editing, real-time SLA deadline tracking, intelligent AI-assisted response drafting, and persistent local storage.
 
 ---
 
@@ -12,6 +12,7 @@
 - [Technology Stack](#-technology-stack)
 - [System Architecture & Storage Limitations](#-system-architecture--storage-limitations)
 - [AI Assistant Architecture & Transparency](#-ai-assistant-architecture--transparency)
+- [SLA Tracking & Service Level Architecture](#-sla-tracking--service-level-architecture)
 - [Notice Regarding Separate Salesforce Work](#-notice-regarding-separate-salesforce-work)
 - [Getting Started & Installation](#-getting-started--installation)
 - [Running the Application](#-running-the-application)
@@ -23,48 +24,58 @@
 
 ## 🌟 Overview
 
-**SupportFlow** is an enterprise-grade customer support desk application designed to streamline customer inquiry intake, issue prioritization, team assignment, and resolution workflows.
+**SupportFlow** is an enterprise-grade customer support desk application designed to streamline customer inquiry intake, issue prioritization, team assignment, SLA compliance, and resolution workflows.
 
-Built from scratch for a college capstone demonstration, it combines modern web aesthetics with a reliable Node.js backend. It features an interactive dashboard, real-time search and multi-criteria filtering, a ticket details management drawer, and a transparent AI response assistant.
+Built with a modern **React 18 + Tailwind CSS** frontend and a robust **Node.js / Express** backend, SupportFlow provides live analytics charts calculated dynamically from real ticket data, instant search and multi-criteria filtering, full ticket editing, a responsive dual-view (Cards Grid & Data Table), and a transparent AI response assistant.
 
 ---
 
 ## ✨ Key Features
 
-### 1. Executive Dashboard & Metrics
-- **Real-Time Stat Counters:** Live totals for **Total Tickets**, **Open Tickets**, **In Progress**, and **Resolved / Closed**.
-- **Visual Queue Distribution:** Color-coded progress bar illustrating current resolution velocity and ticket status balance.
-- **Urgent Priority Alert Banner:** Dynamically surfaces open high-severity tickets requiring immediate attention.
-- **Category Breakdown Chips:** Instant visibility across Billing, Technical, Account Access, Feature Request, and General Inquiry queues.
+### 1. Executive Dashboard & Live Analytics
+- **Live Stat Counters:** Live totals for **Total Tickets**, **Open Tickets**, **In Progress Tickets**, and **Resolved Tickets**, calculated dynamically from records.
+- **Tickets by Status Chart:** Color-coded status distribution (Open, In Progress, Resolved, Closed) with count and percentage breakdowns.
+- **Tickets by Priority Chart:** Severity distribution tracking Urgent (Red), High (Amber), Medium (Blue), and Low (Slate) queues.
+- **High Attention Urgent Banner:** Automatically alerts support leads when critical tickets require immediate action.
+- **Graceful Empty State:** Clean, helpful fallback states when no records match filter criteria.
 
-### 2. Comprehensive Ticket Management
-- **Fields Supported:** Customer Name, Customer Email, Subject, Description, Category, Priority, Status, Assigned Agent, Created At, and Updated At timestamps.
-- **Search & Multi-Filter Bar:** Real-time search by Ticket ID, Customer Name, Email, Subject, or Description keywords.
-- **Filter by Attributes:** One-click filtering by Status (Open, In Progress, Resolved, Closed), Priority (Urgent, High, Medium, Low), and Category.
-- **Sorting Options:** Sort tickets by Newest First, Priority (High-to-Low), Recently Updated, or Alphabetical Subject.
+### 2. SLA (Service Level Agreement) Tracking
+- **Real-Time Deadlines:** Tracks resolution targets based on ticket priority:
+  - **Urgent:** 4 Hours
+  - **High:** 24 Hours
+  - **Medium:** 48 Hours
+  - **Low:** 72 Hours
+- **Status Indicators:**
+  - `🔥 SLA Overdue`: Highlighted in red with exact elapsed time (e.g., *Overdue by 2h 15m*).
+  - `⏱️ Approaching Deadline`: Highlighted in amber when less than 4 hours remain (e.g., *Due in 1h 30m*).
+  - `✓ On Track`: Highlighted in emerald for healthy resolution windows.
+  - `✅ SLA Met`: Marked when tickets are resolved within their designated SLA window.
+- **Custom Deadline Overrides:** Supports custom datetime deadlines per ticket.
 
-### 3. Ticket Detail & Status Lifecycle Management
-- **Status & Priority Switching:** Instantly transition tickets through their lifecycle (`Open` ➔ `In Progress` ➔ `Resolved` ➔ `Closed`) or escalate priority.
-- **Audit Logging:** System automatically logs timestamped audit records whenever status or priority levels change.
-- **Conversation Thread:** Full message history capturing customer complaints, agent responses, and system events.
-- **One-Click Resolve:** Option to automatically mark ticket as "Resolved" when posting an agent reply.
+### 3. Comprehensive Ticket Management
+- **All Required Fields:** Customer Name, Customer Email, Subject, Description, Category, Priority, Status, Assigned Agent, SLA Deadline, and Created/Updated timestamps.
+- **Create New Tickets:** Modal with input validation, helpful error messages, and automatic unique ID generation (`SF-1001`, `SF-1002`, ...).
+- **Edit Existing Tickets:** Full edit mode allowing modification of customer name, email, subject, description, category, priority, status, assigned agent, and SLA deadline.
+- **Dual View Modes:** Instant toggle between **Cards Grid View** and **Compact Data Table View**.
 
-### 4. AI-Assisted Response Generator
+### 4. Search & Multi-Criteria Filtering
+- **Keyword Search:** Instant search by Ticket ID, Customer Name, Email, Subject, or Description.
+- **Attribute Filters:** One-click filtering by Status (`Open`, `In Progress`, `Resolved`, `Closed`), Priority (`Urgent`, `High`, `Medium`, `Low`), and Category (`Technical`, `Billing`, `Account Access`, `Feature Request`, `General Inquiry`).
+- **Sorting:** Sort by Newest First, Priority (High-to-Low), Recently Updated, or Alphabetical Subject.
+- **Clear Filters:** 1-click reset for all active filter parameters.
+
+### 5. AI-Assisted Response Generator
 - **Context-Aware Drafting:** Analyzes the customer's problem description, category, and severity to generate 3 tailored response options:
   1. *Quick Acknowledgment & Clarification*
   2. *Actionable Resolution & Troubleshooting Guide*
   3. *High Priority Escalation Notice*
-- **1-Click Insert:** Draft text can be inserted directly into the agent reply composer for review and customization.
-- **Transparent Demo Mode:** Built with a contextual heuristic engine requiring zero external API keys or charges.
+- **1-Click Insert:** Copies draft text directly into the agent reply composer for review and customization.
+- **Transparent Demo Mode:** Intelligent contextual template engine that requires zero external API keys or subscription fees.
 - **Optional Live Gemini AI:** If a `GEMINI_API_KEY` is provided in `.env`, SupportFlow seamlessly connects to Google Gemini 1.5 Flash.
 
-### 5. Sample Demonstration Data
-- Pre-populated with 7 realistic enterprise support tickets spanning various categories and priorities.
-- Each demonstration ticket is clearly labeled with a `[Sample Data]` badge.
-- **1-Click Reset:** Includes a &ldquo;Reset Demo&rdquo; button to restore original sample data at any time during presentations.
-
-### 6. Responsive UI
-- Fully responsive across mobile smartphones, tablets, laptops, and ultra-wide desktop monitors using Tailwind CSS.
+### 6. Realistic Demonstration Dataset
+- Pre-populated with 7 realistic enterprise support tickets spanning diverse categories, priorities, and SLA statuses.
+- **1-Click Reset Demo:** A &ldquo;Reset Demo&rdquo; button restores the original clean dataset at any time during presentations.
 
 ---
 
@@ -72,9 +83,9 @@ Built from scratch for a college capstone demonstration, it combines modern web 
 
 | Layer | Technologies Used | Purpose |
 | :--- | :--- | :--- |
-| **Frontend UI** | React 18, Vite 6, Tailwind CSS 3 | Modern component architecture, rapid HMR, utility-first responsive styling |
-| **Icons** | Lucide React | High-clarity iconography for support statuses and priorities |
-| **Backend Server** | Node.js (v18+), Express.js 4 | RESTful API endpoints, request routing, static build serving |
+| **Frontend UI** | React 18, Vite 6, Tailwind CSS 3 | Fast component rendering, live HMR, utility-first styling |
+| **Icons** | Lucide React | High-clarity iconography for support statuses, SLA, and priorities |
+| **Backend Server** | Node.js (v18+), Express.js 4 | RESTful API endpoints, request routing, static build hosting |
 | **Middleware** | CORS, Dotenv | Cross-origin resource sharing and environment management |
 | **Data Storage** | Local JSON File Store (`server/data/tickets.json`) | Persistent file storage with atomic writes and memory caching |
 
@@ -82,11 +93,12 @@ Built from scratch for a college capstone demonstration, it combines modern web 
 
 ## 💾 System Architecture & Storage Limitations
 
-SupportFlow employs a robust, file-based JSON persistence engine located at `server/data/tickets.json`. Every create, update, reply, and deletion is written to disk via atomic temporary-file swapping to prevent data corruption.
+SupportFlow employs a robust file-based JSON persistence engine located at `server/data/tickets.json`. Every create, update, reply, and deletion is written to disk via atomic temporary-file swapping to prevent data corruption.
 
-### Demo Storage Limitations (Clearly Explained for Capstone Evaluation)
-- **Single-Node Architecture:** This database engine is designed for single-server execution, local demonstrations, and classroom evaluations. It does not implement multi-instance distributed file locking.
+### Demo Storage Limitations (Clearly Documented for Evaluation)
+- **Single-Node Architecture:** This storage engine is designed for single-server execution, local demonstrations, and evaluations. It does not implement multi-instance distributed file locking.
 - **Memory Caching:** Tickets are held in memory for sub-millisecond query performance and flushed to disk on mutation.
+- **Browser Cache Backup:** A local snapshot is maintained in browser `localStorage` as a fallback during network reconnections.
 - **Data Scale:** Suited for demonstrative workloads (up to ~10,000 records). 
 - **Production Evolution:** In an enterprise multi-tenant cloud environment, this data access layer (`server/services/ticketService.js`) would be substituted with PostgreSQL, MongoDB, or an enterprise CRM API without changing frontend components.
 
@@ -97,7 +109,7 @@ SupportFlow employs a robust, file-based JSON persistence engine located at `ser
 > **Transparency Statement:** If no real external AI API key is configured, SupportFlow operates in **Transparent Demo Mode**.
 
 - **Offline Demo Engine (Default):** The application uses an intelligent rule-based heuristic template engine that inspects ticket category, priority, customer name, and problem keywords. It generates contextually accurate responses without claiming false API connections.
-- **Live Gemini Integration (Optional):** If you wish to demonstrate live generative AI, add your Google Gemini API key to `.env`:
+- **Live Gemini Integration (Optional):** To connect live generative AI, set your Google Gemini API key in `.env`:
   ```env
   GEMINI_API_KEY=your_gemini_api_key_here
   ```
@@ -107,7 +119,7 @@ SupportFlow employs a robust, file-based JSON persistence engine located at `ser
 
 ## ⚠️ Notice Regarding Separate Salesforce Work
 
-> **Important Clarification for Capstone Evaluation:**
+> **Clarification for Evaluation:**
 >
 > This web application (**SupportFlow**) is a standalone full-stack project with its own custom REST API and local data store.
 >
@@ -139,7 +151,7 @@ Copy the example environment file:
 ```bash
 cp .env.example .env
 ```
-*(No configuration is required — SupportFlow works immediately out-of-the-box in demo mode!)*
+*(No configuration is required — SupportFlow runs immediately out-of-the-box in demo mode!)*
 
 ---
 
@@ -168,7 +180,7 @@ Then open your browser to:
 
 ## 🧪 Automated Testing & Verification
 
-SupportFlow includes an automated end-to-end test suite that verifies all core API routes, ticket creation, status updates, priority escalations, AI suggestion generation, search, filtering, and demo reset:
+SupportFlow includes an automated end-to-end test suite that verifies health, stats calculations, SLA tracking, ticket creation, editing, status/priority updates, AI suggestion generation, search, filtering, and demo reset:
 
 ```bash
 npm test
@@ -183,12 +195,17 @@ Expected output:
   ✅ PASS: Status summaries include Open: 3
   ✅ PASS: Status summaries include In Progress: 2
   ✅ PASS: Status summaries include Resolved: 1
+  ✅ PASS: SLA stats calculated (Overdue: 1, Approaching: 2)
   ✅ PASS: GET /api/tickets returns array of tickets
-  ✅ PASS: Sample ticket identified with isSample=true
+  ✅ PASS: Sample ticket identified with isSample=true (SF-1002)
   ✅ PASS: Ticket created successfully with ID SF-1008
   ✅ PASS: GET /api/tickets/:id retrieves correct customer info
+  ✅ PASS: Custom SLA deadline persisted properly
   ✅ PASS: Status updated to "In Progress"
   ✅ PASS: Priority updated to "Urgent"
+  ✅ PASS: Ticket customer name edited successfully
+  ✅ PASS: Ticket subject edited successfully
+  ✅ PASS: Verified changes persisted to server/data/tickets.json on disk
   ✅ PASS: AI response generator returns array of suggestions
   ✅ PASS: AI generator returned 3 distinct contextual response options
   ✅ PASS: AI Engine transparently reports demo mode: "Contextual AI Demo Engine"
@@ -200,7 +217,7 @@ Expected output:
   ✅ PASS: Demo reset endpoint restored default sample tickets
 
 ===============================================
-Test Results: 20 Passed, 0 Failed
+Test Results: 25 Passed, 0 Failed
 ===============================================
 ```
 
@@ -211,14 +228,14 @@ Test Results: 20 Passed, 0 Failed
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/api/health` | Returns server health status and system timestamp |
-| `GET` | `/api/stats` | Aggregated dashboard metrics (totals, status, priorities, categories) |
+| `GET` | `/api/stats` | Aggregated dashboard metrics (totals, status, priorities, SLA, categories) |
 | `GET` | `/api/tickets` | List tickets with optional `?search=`, `?status=`, `?priority=`, `?category=`, `?sortBy=` |
-| `GET` | `/api/tickets/:id` | Retrieve full ticket details and reply history |
-| `POST` | `/api/tickets` | Create a new ticket (`customerName`, `customerEmail`, `subject`, `description`, `category`, `priority`) |
-| `PATCH` | `/api/tickets/:id` | Update ticket fields (`status`, `priority`, `category`, `assignedTo`) |
+| `GET` | `/api/tickets/:id` | Retrieve full ticket details, conversation history, and SLA status |
+| `POST` | `/api/tickets` | Create a new ticket (`customerName`, `customerEmail`, `subject`, `description`, `category`, `priority`, `slaDeadline`) |
+| `PATCH` | `/api/tickets/:id` | Update ticket fields (`customerName`, `customerEmail`, `subject`, `description`, `status`, `priority`, `category`, `assignedTo`, `slaDeadline`) |
 | `POST` | `/api/tickets/:id/replies` | Add message to ticket conversation (`message`, `sender`, `authorName`, `isAiAssisted`) |
 | `DELETE` | `/api/tickets/:id` | Delete a support ticket |
-| `POST` | `/api/tickets/reset-demo` | Reset storage back to default capstone demonstration dataset |
+| `POST` | `/api/tickets/reset-demo` | Reset storage back to default demonstration dataset |
 | `POST` | `/api/ai/suggest` | Generate contextual AI draft replies based on ticket parameters |
 
 ---
@@ -229,7 +246,7 @@ Test Results: 20 Passed, 0 Failed
 - [x] **No real customer PII:** All sample data uses fictional names (e.g., Elena Rostova, David Miller) and example domains (`@acmecorp.io`).
 - [x] **Clean `.gitignore`:** Ignores `node_modules/`, `dist/`, `.env`, temporary files, and log files.
 - [x] **Reproducible build:** Zero native compilation or system dependencies required; runs immediately on Windows, macOS, or Linux.
-- [x] **Tested & verified:** 20/20 automated end-to-end tests passing.
+- [x] **Tested & verified:** 25/25 automated end-to-end tests passing.
 
 ---
 

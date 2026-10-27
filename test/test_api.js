@@ -1,5 +1,6 @@
 // Automated End-to-End Verification Test for SupportFlow
-import http from 'http';
+import fs from 'fs';
+import path from 'path';
 
 const BASE = 'http://127.0.0.1:5000';
 
@@ -40,6 +41,7 @@ async function runTests() {
     assert(stats.statusCounts.Open > 0, `Status summaries include Open: ${stats?.statusCounts?.Open}`);
     assert(stats.statusCounts['In Progress'] > 0, `Status summaries include In Progress: ${stats?.statusCounts?.['In Progress']}`);
     assert(stats.statusCounts.Resolved > 0, `Status summaries include Resolved: ${stats?.statusCounts?.Resolved}`);
+    assert(stats.slaCounts && stats.slaCounts.overdue !== undefined, `SLA stats calculated (Overdue: ${stats?.slaCounts?.overdue}, Approaching: ${stats?.slaCounts?.approaching})`);
 
     // 3. Fetch tickets list
     const ticketsRes = await request('/api/tickets');
@@ -47,7 +49,8 @@ async function runTests() {
     const sampleTicket = ticketsRes.data.data.find(t => t.isSample);
     assert(sampleTicket !== undefined, `Sample ticket identified with isSample=true (${sampleTicket?.id})`);
 
-    // 4. Create a new ticket
+    // 4. Create a new ticket with SLA
+    const customDeadline = new Date(Date.now() + 3600000 * 5).toISOString();
     const newTicketPayload = {
       customerName: 'Marcus Holloway',
       customerEmail: 'marcus@dedsec.org',
@@ -55,6 +58,7 @@ async function runTests() {
       description: 'Users cannot log into the admin dashboard via SAML 2.0. HTTP 500 error returned.',
       category: 'Technical',
       priority: 'High',
+      slaDeadline: customDeadline,
     };
     const createRes = await request('/api/tickets', {
       method: 'POST',
@@ -66,6 +70,7 @@ async function runTests() {
     // 5. Fetch single ticket details
     const singleTicket = await request(`/api/tickets/${createdId}`);
     assert(singleTicket.ok && singleTicket.data.data.customerName === 'Marcus Holloway', 'GET /api/tickets/:id retrieves correct customer info');
+    assert(singleTicket.data.data.slaDeadline === customDeadline, 'Custom SLA deadline persisted properly');
 
     // 6. Update ticket status & priority
     const patchRes = await request(`/api/tickets/${createdId}`, {
@@ -75,13 +80,32 @@ async function runTests() {
     assert(patchRes.ok && patchRes.data.data.status === 'In Progress', 'Status updated to "In Progress"');
     assert(patchRes.data.data.priority === 'Urgent', 'Priority updated to "Urgent"');
 
-    // 7. Test AI Suggestion generation (Demo Mode)
+    // 7. Full ticket editing (edit customerName, subject, description)
+    const editRes = await request(`/api/tickets/${createdId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        customerName: 'Marcus Holloway (Lead Eng)',
+        subject: 'SSO SAML Gateway Recovery in Progress',
+        description: 'Upstream certificates were rotated. Re-validating identity assertions.',
+        category: 'Technical',
+      }),
+    });
+    assert(editRes.ok && editRes.data.data.customerName === 'Marcus Holloway (Lead Eng)', 'Ticket customer name edited successfully');
+    assert(editRes.data.data.subject === 'SSO SAML Gateway Recovery in Progress', 'Ticket subject edited successfully');
+
+    // 8. Disk persistence check
+    const diskPath = path.resolve('server', 'data', 'tickets.json');
+    const diskContent = JSON.parse(fs.readFileSync(diskPath, 'utf8'));
+    const diskTicket = diskContent.find(t => t.id === createdId);
+    assert(diskTicket && diskTicket.subject === 'SSO SAML Gateway Recovery in Progress', 'Verified changes persisted to server/data/tickets.json on disk');
+
+    // 9. Test AI Suggestion generation (Demo Mode)
     const aiRes = await request('/api/ai/suggest', {
       method: 'POST',
       body: JSON.stringify({
         customerName: 'Marcus Holloway',
-        subject: 'SSO authentication failure on login gateway',
-        description: 'Users cannot log into the admin dashboard via SAML 2.0. HTTP 500 error returned.',
+        subject: 'SSO SAML Gateway Recovery in Progress',
+        description: 'Upstream certificates were rotated. Re-validating identity assertions.',
         category: 'Technical',
         priority: 'Urgent',
       }),
@@ -91,7 +115,7 @@ async function runTests() {
     assert(aiRes.data.isSimulated === true, `AI Engine transparently reports demo mode: "${aiRes.data.mode}"`);
     console.log(`     -> Sample AI Draft Title: "${aiRes.data.suggestions[0].title}"`);
 
-    // 8. Add Reply to ticket
+    // 10. Add Reply to ticket
     const replyRes = await request(`/api/tickets/${createdId}/replies`, {
       method: 'POST',
       body: JSON.stringify({
@@ -104,18 +128,18 @@ async function runTests() {
     assert(replyRes.status === 201, 'Agent reply added to conversation history');
     assert(replyRes.data.data.replies.some(r => r.isAiAssisted === true), 'Reply successfully tagged as isAiAssisted=true');
 
-    // 9. Search and Filter
+    // 11. Search and Filter
     const searchRes = await request('/api/tickets?search=Marcus');
     assert(searchRes.ok && searchRes.data.data.length >= 1, `Search by customer name found ${searchRes.data.data.length} match`);
 
     const filterStatus = await request('/api/tickets?status=In%20Progress');
     assert(filterStatus.ok && filterStatus.data.data.every(t => t.status === 'In Progress'), 'Filter by status "In Progress" verified');
 
-    // 10. Clean up / Delete test ticket
+    // 12. Clean up / Delete test ticket
     const deleteRes = await request(`/api/tickets/${createdId}`, { method: 'DELETE' });
     assert(deleteRes.ok, `Test ticket ${createdId} deleted successfully`);
 
-    // 11. Test Reset Demo endpoint
+    // 13. Test Reset Demo endpoint
     const resetRes = await request('/api/tickets/reset-demo', { method: 'POST' });
     assert(resetRes.ok && resetRes.data.count >= 7, 'Demo reset endpoint restored default sample tickets');
 
@@ -131,7 +155,13 @@ async function runTests() {
   }
 }
 
-// Start server and run tests
+// Start server and run tests if not already running
 import('../server/server.js').then(() => {
   setTimeout(runTests, 800);
+}).catch((e) => {
+  if (e.code === 'EADDRINUSE') {
+    runTests();
+  } else {
+    console.error(e);
+  }
 });

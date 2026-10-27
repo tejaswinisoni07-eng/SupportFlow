@@ -146,6 +146,14 @@ export async function createTicket(ticketData) {
   const newId = `SF-${maxNumber + 1}`;
   const now = new Date().toISOString();
 
+  // SLA deadline calculation: use provided deadline or calculate from standard priority policy
+  let slaDeadline = ticketData.slaDeadline;
+  if (!slaDeadline) {
+    const slaHoursMap = { Urgent: 4, High: 24, Medium: 48, Low: 72 };
+    const hours = slaHoursMap[ticketData.priority] || 48;
+    slaDeadline = new Date(Date.now() + hours * 3600000).toISOString();
+  }
+
   const newTicket = {
     id: newId,
     customerName: (ticketData.customerName || 'Anonymous Customer').trim(),
@@ -156,6 +164,7 @@ export async function createTicket(ticketData) {
     priority: ticketData.priority || 'Medium',
     status: ticketData.status || 'Open',
     assignedTo: ticketData.assignedTo || 'Unassigned',
+    slaDeadline,
     isSample: false, // User-created tickets are not sample tickets
     createdAt: now,
     updatedAt: now,
@@ -298,6 +307,16 @@ export async function getStats() {
     Low: 0,
   };
   const categoryCounts = {};
+  const slaCounts = {
+    onTrack: 0,
+    approaching: 0,
+    overdue: 0,
+    met: 0,
+    breached: 0,
+    none: 0,
+  };
+
+  const now = new Date();
 
   let sampleCount = 0;
   let customCount = 0;
@@ -307,6 +326,23 @@ export async function getStats() {
     if (priorityCounts[t.priority] !== undefined) priorityCounts[t.priority]++;
     
     categoryCounts[t.category] = (categoryCounts[t.category] || 0) + 1;
+
+    // SLA status analysis
+    if (t.slaDeadline) {
+      const deadline = new Date(t.slaDeadline);
+      if (t.status === 'Resolved' || t.status === 'Closed') {
+        const resolvedAt = new Date(t.updatedAt || t.createdAt);
+        if (resolvedAt <= deadline) slaCounts.met++;
+        else slaCounts.breached++;
+      } else {
+        const diffMs = deadline.getTime() - now.getTime();
+        if (diffMs < 0) slaCounts.overdue++;
+        else if (diffMs <= 4 * 3600 * 1000) slaCounts.approaching++;
+        else slaCounts.onTrack++;
+      }
+    } else {
+      slaCounts.none++;
+    }
 
     if (t.isSample) sampleCount++;
     else customCount++;
@@ -321,6 +357,7 @@ export async function getStats() {
     statusCounts,
     priorityCounts,
     categoryCounts,
+    slaCounts,
     urgentOrHighOpen,
     sampleCount,
     customCount,
