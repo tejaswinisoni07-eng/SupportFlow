@@ -125,13 +125,6 @@ export default function TicketCard({ ticket, onSelectTicket }) {
               {ticket.id}
             </span>
             {getCategoryBadge(ticket.category)}
-            
-            {/* Sample Data Badge required by prompt */}
-            {ticket.isSample && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
-                Sample Data
-              </span>
-            )}
           </div>
 
           <div className="flex items-center space-x-2">

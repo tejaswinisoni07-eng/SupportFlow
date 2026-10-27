@@ -136,11 +136,6 @@ export default function TicketDetailModal({
               {ticket.id}
             </span>
             {getCategoryBadge(ticket.category)}
-            {ticket.isSample && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
-                Sample Demonstration Ticket
-              </span>
-            )}
           </div>
           <button
             onClick={onClose}
