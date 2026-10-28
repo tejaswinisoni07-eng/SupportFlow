@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { X, Plus, AlertCircle, Sparkles } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, AlertCircle, Sparkles, Lightbulb } from 'lucide-react';
+import { analyzePrioritySuggestion } from '../utils/prioritySuggester';
 
 export default function NewTicketModal({ onClose, onCreateTicket, showToast }) {
   const [formData, setFormData] = useState({
@@ -13,6 +14,24 @@ export default function NewTicketModal({ onClose, onCreateTicket, showToast }) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const prioritySuggestion = useMemo(() => {
+  return analyzePrioritySuggestion(
+    formData.subject,
+    formData.description
+  );
+}, [formData.subject, formData.description]);
+
+const applyPrioritySuggestion = () => {
+  setFormData((previous) => ({
+    ...previous,
+    priority: prioritySuggestion.suggestedPriority,
+  }));
+
+  showToast(
+    `Priority updated to ${prioritySuggestion.suggestedPriority}`,
+    'success'
+  );
+};
 
   const validate = () => {
     const errs = {};
@@ -183,6 +202,84 @@ export default function NewTicketModal({ onClose, onCreateTicket, showToast }) {
               </p>
             )}
           </div>
+          {/* Smart Priority Suggestion */}
+<div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+  <div className="flex items-start gap-3">
+    <div className="rounded-lg bg-white p-2">
+      <Lightbulb className="h-5 w-5 text-indigo-600" />
+    </div>
+
+    <div className="flex-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-bold text-slate-900">
+          Smart Priority Suggestion
+        </h3>
+
+        <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-indigo-700">
+          Rule-Based Analysis
+        </span>
+      </div>
+
+      <p className="mt-1 text-sm text-slate-600">
+        Recommended priority based on the ticket subject and description.
+      </p>
+    </div>
+  </div>
+
+  <div className="rounded-lg border border-indigo-100 bg-white p-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="text-sm font-medium text-slate-700">
+        Suggested Priority
+      </span>
+
+      <span
+        className={`rounded-full px-3 py-1 text-xs font-bold ${
+          prioritySuggestion.suggestedPriority === 'High'
+            ? 'bg-rose-100 text-rose-700'
+            : prioritySuggestion.suggestedPriority === 'Low'
+            ? 'bg-emerald-100 text-emerald-700'
+            : 'bg-amber-100 text-amber-700'
+        }`}
+      >
+        {prioritySuggestion.suggestedPriority}
+      </span>
+    </div>
+
+    <p className="mt-2 text-xs leading-relaxed text-slate-600">
+      {prioritySuggestion.reason}
+    </p>
+
+    {prioritySuggestion.matchedKeywords.length > 0 && (
+      <div className="mt-2 flex flex-wrap gap-1">
+        {prioritySuggestion.matchedKeywords.map((keyword) => (
+          <span
+            key={keyword}
+            className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
+          >
+            {keyword}
+          </span>
+        ))}
+      </div>
+    )}
+  </div>
+
+  <div className="flex flex-wrap items-center justify-between gap-3">
+    <p className="text-xs text-slate-500">
+      Current priority: <strong>{formData.priority}</strong>
+    </p>
+
+    <button
+      type="button"
+      onClick={applyPrioritySuggestion}
+      disabled={formData.priority === prioritySuggestion.suggestedPriority}
+      className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {formData.priority === prioritySuggestion.suggestedPriority
+        ? 'Suggestion Applied'
+        : 'Apply Suggestion'}
+    </button>
+  </div>
+</div>
 
           <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 text-xs text-indigo-900 flex items-center space-x-2">
             <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />

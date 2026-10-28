@@ -165,9 +165,21 @@ export async function createTicket(ticketData) {
     status: ticketData.status || 'Open',
     assignedTo: ticketData.assignedTo || 'Unassigned',
     slaDeadline,
+    satisfaction: null,
     isSample: false, // User-created tickets are not sample tickets
     createdAt: now,
     updatedAt: now,
+    activities: [
+      {
+        id: `act-${Date.now()}-created`,
+        type: 'ticket_created',
+        description: `Ticket created by ${ticketData.customerName || 'Customer'}.`,
+        timestamp: now,
+        actor: ticketData.customerName || 'Customer',
+        oldValue: null,
+        newValue: 'Open',
+      }
+    ],
     replies: [
       {
         id: `rep-${Date.now()}`,
@@ -198,11 +210,66 @@ export async function updateTicket(id, updates) {
 
   // Create audit system reply if status or priority changes
   const auditLogs = [];
+  const newActivities = [...(current.activities || [])];
+
   if (updates.status && updates.status !== current.status) {
     auditLogs.push(`Status updated from "${current.status}" to "${updates.status}".`);
+    if (updates.status === 'Resolved') {
+      newActivities.push({
+        id: `act-${Date.now()}-resolved`,
+        type: 'ticket_resolved',
+        description: `Ticket marked as Resolved (from "${current.status}").`,
+        timestamp: now,
+        actor: 'Support Agent',
+        oldValue: current.status,
+        newValue: 'Resolved',
+      });
+    } else {
+      newActivities.push({
+        id: `act-${Date.now()}-status`,
+        type: 'status_changed',
+        description: `Status changed from "${current.status}" to "${updates.status}".`,
+        timestamp: now,
+        actor: 'Support Agent',
+        oldValue: current.status,
+        newValue: updates.status,
+      });
+    }
   }
+
   if (updates.priority && updates.priority !== current.priority) {
     auditLogs.push(`Priority changed from "${current.priority}" to "${updates.priority}".`);
+    newActivities.push({
+      id: `act-${Date.now()}-priority`,
+      type: 'priority_changed',
+      description: `Priority changed from "${current.priority}" to "${updates.priority}".`,
+      timestamp: now,
+      actor: 'Support Agent',
+      oldValue: current.priority,
+      newValue: updates.priority,
+    });
+  }
+
+  // Detect detail edits
+  const editedFields = [];
+  if (updates.subject && updates.subject !== current.subject) editedFields.push('subject');
+  if (updates.description && updates.description !== current.description) editedFields.push('description');
+  if (updates.category && updates.category !== current.category) editedFields.push(`category (${current.category} ➔ ${updates.category})`);
+  if (updates.customerName && updates.customerName !== current.customerName) editedFields.push('customer name');
+  if (updates.customerEmail && updates.customerEmail !== current.customerEmail) editedFields.push('customer email');
+  if (updates.assignedTo && updates.assignedTo !== current.assignedTo) editedFields.push(`assigned agent (${updates.assignedTo})`);
+  if (updates.slaDeadline && updates.slaDeadline !== current.slaDeadline) editedFields.push('SLA deadline');
+
+  if (editedFields.length > 0) {
+    newActivities.push({
+      id: `act-${Date.now()}-edited`,
+      type: 'ticket_edited',
+      description: `Ticket details updated: ${editedFields.join(', ')}.`,
+      timestamp: now,
+      actor: 'Support Agent',
+      oldValue: null,
+      newValue: editedFields.join(', '),
+    });
   }
 
   const updatedReplies = [...(current.replies || [])];
@@ -219,7 +286,50 @@ export async function updateTicket(id, updates) {
   const updatedTicket = {
     ...current,
     ...updates,
+    activities: newActivities,
     replies: updatedReplies,
+    updatedAt: now,
+  };
+
+  cachedTickets[index] = updatedTicket;
+  await saveTicketsToDisk();
+  return updatedTicket;
+}
+
+/**
+ * Submit Customer Satisfaction feedback for a ticket
+ */
+export async function addSatisfaction(id, { rating, comment }) {
+  if (!cachedTickets) await initStorage();
+
+  const index = cachedTickets.findIndex(t => t.id === id);
+  if (index === -1) return null;
+
+  const current = cachedTickets[index];
+  const now = new Date().toISOString();
+  const numRating = Math.min(5, Math.max(1, parseInt(rating, 10) || 5));
+
+  const satisfactionData = {
+    rating: numRating,
+    comment: (comment || '').trim(),
+    submittedAt: now,
+  };
+
+  const newActivities = [...(current.activities || [])];
+  newActivities.push({
+    id: `act-${Date.now()}-csat`,
+    type: 'feedback_submitted',
+    description: `Customer submitted satisfaction rating: ${numRating} Star${numRating > 1 ? 's' : ''}${satisfactionData.comment ? ` - "${satisfactionData.comment}"` : ''}.`,
+    timestamp: now,
+    actor: 'Customer',
+    oldValue: null,
+    newValue: `${numRating} Stars`,
+  });
+
+  const updatedTicket = {
+    ...current,
+    satisfaction: satisfactionData,
+    activities: newActivities,
     updatedAt: now,
   };
 
@@ -352,12 +462,62 @@ export async function getStats() {
     t => (t.priority === 'Urgent' || t.priority === 'High') && (t.status === 'Open' || t.status === 'In Progress')
   ).length;
 
+  // Agent Performance Summary (calculated strictly from actual ticket records)
+  const agentMap = {};
+  for (const t of cachedTickets) {
+    const agent = (t.assignedTo || 'Unassigned').trim();
+    if (!agentMap[agent]) {
+      agentMap[agent] = {
+        agentName: agent,
+        assignedCount: 0,
+        resolvedCount: 0,
+        totalResolutionTimeMs: 0,
+        resolvedWithTimeCount: 0,
+      };
+    }
+    agentMap[agent].assignedCount++;
+
+    if (t.status === 'Resolved' || t.status === 'Closed') {
+      agentMap[agent].resolvedCount++;
+      if (t.createdAt && t.updatedAt) {
+        const createdMs = new Date(t.createdAt).getTime();
+        const resolvedMs = new Date(t.updatedAt).getTime();
+        if (resolvedMs > createdMs) {
+          agentMap[agent].totalResolutionTimeMs += (resolvedMs - createdMs);
+          agentMap[agent].resolvedWithTimeCount++;
+        }
+      }
+    }
+  }
+
+  const agentPerformance = Object.values(agentMap).map(a => {
+    let avgResolutionTimeText = 'N/A (No resolved tickets with verified duration)';
+    let avgResolutionMinutes = null;
+    if (a.resolvedWithTimeCount > 0) {
+      const avgMs = a.totalResolutionTimeMs / a.resolvedWithTimeCount;
+      const mins = Math.round(avgMs / 60000);
+      avgResolutionMinutes = mins;
+      const hours = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      avgResolutionTimeText = hours > 0 ? `${hours}h ${remMins}m` : `${remMins}m`;
+    }
+
+    return {
+      agentName: a.agentName,
+      assignedCount: a.assignedCount,
+      resolvedCount: a.resolvedCount,
+      avgResolutionTimeText,
+      avgResolutionMinutes,
+    };
+  });
+
   return {
     total,
     statusCounts,
     priorityCounts,
     categoryCounts,
     slaCounts,
+    agentPerformance,
     urgentOrHighOpen,
     sampleCount,
     customCount,

@@ -1,22 +1,25 @@
 /**
  * SLA Helper utility for SupportFlow
+ * 
+ * Supports dynamic real-time recalculation using current system time.
  */
 
-export function getSlaInfo(ticket) {
+export function getSlaInfo(ticket, currentTime = new Date()) {
   if (!ticket || !ticket.slaDeadline) {
     return {
       status: 'none',
-      label: 'No Deadline Specified',
+      label: 'No SLA Configured',
       badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
-      timeText: 'No SLA Target',
+      timeText: 'No SLA Deadline',
       isOverdue: false,
+      isDueSoon: false,
       isApproaching: false,
       deadlineFormatted: 'Not configured',
     };
   }
 
   const deadline = new Date(ticket.slaDeadline);
-  const now = new Date();
+  const now = currentTime instanceof Date ? currentTime : new Date(currentTime);
   const deadlineFormatted = deadline.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -24,7 +27,7 @@ export function getSlaInfo(ticket) {
     minute: '2-digit',
   });
 
-  // If ticket is Resolved or Closed
+  // If ticket is Resolved or Closed: Do NOT show Overdue
   if (ticket.status === 'Resolved' || ticket.status === 'Closed') {
     const resolvedAt = new Date(ticket.updatedAt || ticket.createdAt);
     const met = resolvedAt <= deadline;
@@ -32,9 +35,10 @@ export function getSlaInfo(ticket) {
       return {
         status: 'met',
         label: 'SLA Met',
-        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold',
         timeText: 'Resolved within SLA target',
         isOverdue: false,
+        isDueSoon: false,
         isApproaching: false,
         deadlineFormatted,
       };
@@ -42,16 +46,17 @@ export function getSlaInfo(ticket) {
       return {
         status: 'breached',
         label: 'SLA Breached',
-        badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
-        timeText: 'Resolved after deadline',
-        isOverdue: true,
+        badgeClass: 'bg-slate-100 text-slate-700 border-slate-300 font-medium',
+        timeText: 'Resolved past deadline',
+        isOverdue: false, // Resolved tickets are not in an active overdue alert state
+        isDueSoon: false,
         isApproaching: false,
         deadlineFormatted,
       };
     }
   }
 
-  // For Open or In Progress tickets
+  // Active tickets (Open or In Progress)
   const diffMs = deadline.getTime() - now.getTime();
 
   if (diffMs < 0) {
@@ -64,26 +69,28 @@ export function getSlaInfo(ticket) {
     return {
       status: 'overdue',
       label: 'SLA Overdue',
-      badgeClass: 'bg-rose-50 text-rose-700 border-rose-200 font-semibold',
+      badgeClass: 'bg-rose-50 text-rose-700 border-rose-200 font-bold animate-pulse',
       timeText,
       isOverdue: true,
+      isDueSoon: false,
       isApproaching: false,
       deadlineFormatted,
     };
   }
 
   if (diffMs <= 4 * 3600 * 1000) {
-    // Approaching deadline (< 4 hours)
+    // Due Soon (< 4 hours)
     const hours = Math.floor(diffMs / 3600000);
     const mins = Math.floor((diffMs % 3600000) / 60000);
     const timeText = hours > 0 ? `Due in ${hours}h ${mins}m` : `Due in ${mins}m`;
 
     return {
       status: 'approaching',
-      label: 'Approaching Deadline',
+      label: 'Due Soon',
       badgeClass: 'bg-amber-50 text-amber-700 border-amber-200 font-semibold',
       timeText,
       isOverdue: false,
+      isDueSoon: true,
       isApproaching: true,
       deadlineFormatted,
     };
@@ -100,6 +107,7 @@ export function getSlaInfo(ticket) {
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     timeText,
     isOverdue: false,
+    isDueSoon: false,
     isApproaching: false,
     deadlineFormatted,
   };

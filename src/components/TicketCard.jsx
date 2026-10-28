@@ -110,7 +110,7 @@ function formatDate(isoString) {
   });
 }
 
-export default function TicketCard({ ticket, onSelectTicket }) {
+export default function TicketCard({ ticket, onSelectTicket, onQuickResolve }) {
   const repliesCount = ticket.replies?.length || 0;
   const sla = getSlaInfo(ticket);
 
@@ -147,11 +147,27 @@ export default function TicketCard({ ticket, onSelectTicket }) {
 
         {/* SLA Status Pill if configured */}
         {sla.status !== 'none' && (
-          <div className="mb-3">
+          <div className="mb-3 flex items-center justify-between">
             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-3xs font-medium border ${sla.badgeClass}`}>
               <Clock className="w-2.5 h-2.5 mr-1" />
               <span>{sla.label}: <strong className="ml-1">{sla.timeText}</strong></span>
             </span>
+
+            {/* Quick Resolve button */}
+            {onQuickResolve && ticket.status !== 'Resolved' && ticket.status !== 'Closed' && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onQuickResolve(ticket.id);
+                }}
+                className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-3xs font-semibold flex items-center space-x-1 transition-colors"
+                title="Quick Action: Mark as Resolved"
+              >
+                <CheckCircle className="w-2.5 h-2.5 text-emerald-600" />
+                <span>Quick Resolve</span>
+              </button>
+            )}
           </div>
         )}
       </div>

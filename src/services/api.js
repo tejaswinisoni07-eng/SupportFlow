@@ -92,3 +92,25 @@ export async function fetchAiSuggestions(ticketData) {
   if (!res.ok) throw new Error(json.error || 'Failed to generate AI suggestion');
   return json;
 }
+
+export async function submitSatisfaction(id, { rating, comment }) {
+  const res = await fetch(`${API_BASE}/tickets/${id}/satisfaction`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rating, comment }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to submit feedback');
+  return json.data;
+}
+
+export async function suggestPriorityApi(subject, description) {
+  const res = await fetch(`${API_BASE}/ai/suggest-priority`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subject, description }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to analyze priority');
+  return json;
+}

@@ -153,4 +153,117 @@ Return valid JSON format with array "suggestions": [{"title": "...", "descriptio
   }
 });
 
+/**
+ * POST /api/ai/suggest-priority
+ * Transparent rule-based heuristic priority recommendation
+ */
+router.post('/suggest-priority', (req, res) => {
+  try {
+    const { subject = '', description = '' } = req.body;
+    const combined = `${subject} ${description}`.toLowerCase().trim();
+
+    if (!combined) {
+      return res.json({
+        success: true,
+        suggestedPriority: 'Medium',
+        confidence: 'Standard',
+        isAiGenerated: false,
+        engine: 'Rule-Based Heuristic Engine',
+        reason: 'No subject or description provided. Standard Medium priority recommended by default.',
+        matchedKeywords: [],
+      });
+    }
+
+    // High Priority Patterns
+    const highKeywords = [
+      'payment deducted', 'money deducted', 'deducted', 'charged twice',
+      'duplicate charge', 'order not placed', 'billing error', 'unauthorized charge',
+      'credit card charged', 'failed transaction', 'money taken', 'refund immediately',
+      'cannot access', 'cant access', 'locked out', 'account locked', 'lost access',
+      'reset mfa', '2fa reset', 'mfa reset', 'authenticator app', 'security breach',
+      'production down', 'system down', 'outage', '504 gateway', '504', '500 error',
+      'critical bug', 'data loss', 'database crash', 'emergency', 'urgent', 'asap'
+    ];
+    const matchedHigh = highKeywords.filter(k => combined.includes(k));
+    if (matchedHigh.length > 0) {
+      let reason = 'High priority recommended: critical operational disruption, security access lockout, or billing error detected.';
+      if (matchedHigh.some(k => k.includes('payment') || k.includes('deducted') || k.includes('charge') || k.includes('order'))) {
+        reason = 'Financial discrepancy detected: customer reported payment deduction without order placement or duplicate charge.';
+      } else if (matchedHigh.some(k => k.includes('access') || k.includes('locked') || k.includes('mfa') || k.includes('2fa'))) {
+        reason = 'Access lockout detected: user or administrator cannot access an important account or authentication system.';
+      } else if (matchedHigh.some(k => k.includes('down') || k.includes('outage') || k.includes('504') || k.includes('crash'))) {
+        reason = 'Critical service outage or production-breaking technical failure reported.';
+      }
+      return res.json({
+        success: true,
+        suggestedPriority: 'High',
+        confidence: 'High',
+        isAiGenerated: false,
+        engine: 'Rule-Based Heuristic Engine',
+        reason,
+        matchedKeywords: matchedHigh,
+      });
+    }
+
+    // Low Priority Patterns
+    const lowKeywords = [
+      'profile update', 'minor profile', 'change profile', 'update name',
+      'update phone', 'typo', 'avatar', 'color scheme', 'theme', 'cosmetic',
+      'discount', 'educational pricing', 'student discount', 'coupon', 'promo code',
+      'general question', 'general feedback'
+    ];
+    const matchedLow = lowKeywords.filter(k => combined.includes(k));
+    if (matchedLow.length > 0) {
+      let reason = 'Low priority recommended: minor administrative request or general inquiry without operational disruption.';
+      if (matchedLow.some(k => k.includes('profile') || k.includes('avatar') || k.includes('theme') || k.includes('typo'))) {
+        reason = 'Minor profile update or cosmetic request without operational disruption.';
+      } else if (matchedLow.some(k => k.includes('discount') || k.includes('educational') || k.includes('student'))) {
+        reason = 'General sales or educational discount inquiry.';
+      }
+      return res.json({
+        success: true,
+        suggestedPriority: 'Low',
+        confidence: 'High',
+        isAiGenerated: false,
+        engine: 'Rule-Based Heuristic Engine',
+        reason,
+        matchedKeywords: matchedLow,
+      });
+    }
+
+    // Medium Priority Patterns
+    const mediumKeywords = [
+      'feature question', 'general feature', 'how do i', 'how to', 'bulk export',
+      'csv export', 'api rate limit', 'rate limit', 'webhook', 'documentation',
+      'integration guide', 'export data'
+    ];
+    const matchedMed = mediumKeywords.filter(k => combined.includes(k));
+    if (matchedMed.length > 0) {
+      return res.json({
+        success: true,
+        suggestedPriority: 'Medium',
+        confidence: 'High',
+        isAiGenerated: false,
+        engine: 'Rule-Based Heuristic Engine',
+        reason: 'Standard product workflow: general feature inquiry or non-blocking technical consultation.',
+        matchedKeywords: matchedMed,
+      });
+    }
+
+    // Default
+    return res.json({
+      success: true,
+      suggestedPriority: 'Medium',
+      confidence: 'Standard',
+      isAiGenerated: false,
+      engine: 'Rule-Based Heuristic Engine',
+      reason: 'Standard support intake: no critical urgency or low-priority triggers identified.',
+      matchedKeywords: [],
+    });
+  } catch (err) {
+    console.error('Error in priority suggestion endpoint:', err);
+    res.status(500).json({ success: false, error: 'Failed to analyze priority' });
+  }
+});
+
 export default router;

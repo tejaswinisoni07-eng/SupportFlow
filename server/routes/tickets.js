@@ -7,6 +7,7 @@ import {
   addReply,
   deleteTicket,
   resetToDefault,
+  addSatisfaction,
 } from '../services/ticketService.js';
 
 const router = express.Router();
@@ -177,6 +178,42 @@ router.post('/:id/replies', async (req, res) => {
   } catch (err) {
     console.error('Error posting reply:', err);
     res.status(500).json({ success: false, error: 'Failed to post reply' });
+  }
+});
+
+/**
+ * POST /api/tickets/:id/satisfaction
+ * Submit customer satisfaction rating (1-5 stars) and optional comment
+ */
+router.post('/:id/satisfaction', async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    const numRating = parseInt(rating, 10);
+
+    if (isNaN(numRating) || numRating < 1 || numRating > 5) {
+      return res.status(400).json({
+        success: false,
+        error: 'Rating is required and must be an integer between 1 and 5 stars.',
+      });
+    }
+
+    const updated = await addSatisfaction(req.params.id, {
+      rating: numRating,
+      comment: (comment || '').trim(),
+    });
+
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Customer satisfaction feedback recorded successfully.',
+      data: updated,
+    });
+  } catch (err) {
+    console.error('Error recording satisfaction feedback:', err);
+    res.status(500).json({ success: false, error: 'Failed to record satisfaction feedback' });
   }
 });
 

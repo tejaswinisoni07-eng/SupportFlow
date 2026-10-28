@@ -26,6 +26,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
   const [error, setError] = useState(null);
+  const [updatingTicketId, setUpdatingTicketId] = useState(null);
 
   // Filters & View state
   const [search, setSearch] = useState('');
@@ -120,17 +121,22 @@ export default function App() {
 
   // Handle updating ticket
   const handleUpdateTicket = async (id, updates) => {
-    const updated = await updateTicket(id, updates);
-    // Update local list
-    setTickets((prev) => prev.map((t) => (t.id === id ? updated : t)));
-    // Update selected ticket
-    if (selectedTicket && selectedTicket.id === id) {
-      setSelectedTicket(updated);
+    setUpdatingTicketId(id);
+    try {
+      const updated = await updateTicket(id, updates);
+      // Update local list
+      setTickets((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      // Update selected ticket
+      if (selectedTicket && selectedTicket.id === id) {
+        setSelectedTicket(updated);
+      }
+      // Refresh stats
+      const updatedStats = await fetchStats();
+      setStats(updatedStats);
+      return updated;
+    } finally {
+      setUpdatingTicketId(null);
     }
-    // Refresh stats
-    const updatedStats = await fetchStats();
-    setStats(updatedStats);
-    return updated;
   };
 
   // Handle adding reply
@@ -265,6 +271,8 @@ export default function App() {
             tickets={tickets}
             onSelectTicket={(t) => setSelectedTicket(t)}
             onEditTicket={(t) => setSelectedTicket(t)}
+            onQuickUpdate={handleUpdateTicket}
+            updatingTicketId={updatingTicketId}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
