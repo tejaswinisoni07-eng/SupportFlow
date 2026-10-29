@@ -1,5 +1,5 @@
 // SupportFlow Client API Service
-const API_BASE = '/api';
+const API_BASE = 'https://supportflow-yfc2.onrender.com/api';
 
 export async function fetchTickets(filters = {}) {
   const params = new URLSearchParams();
